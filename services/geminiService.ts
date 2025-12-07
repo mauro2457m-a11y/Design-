@@ -1,3 +1,4 @@
+import { GoogleGenAI } from '@google/genai';
 import { DesignType, type Design } from '../types';
 
 interface DesignConfig {
@@ -23,29 +24,33 @@ const designConfigs: DesignConfig[] = [
   { type: DesignType.POST, promptSuffix: 'post para rede social (Instagram), design gráfico informativo com tipografia forte.', aspectRatio: '1:1' },
 ];
 
-// Helper to get dimensions from aspect ratio
-const getDimensions = (aspectRatio: '1:1' | '16:9' | '9:16' | '4:3'): { width: number, height: number } => {
-    switch (aspectRatio) {
-        case '16:9': return { width: 800, height: 450 };
-        case '9:16': return { width: 450, height: 800 };
-        case '4:3': return { width: 800, height: 600 };
-        case '1:1':
-        default: return { width: 500, height: 500 };
+// A chave de API é fornecida automaticamente pelo ambiente.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+
+async function generateSingleDesign(basePrompt: string, config: DesignConfig, index: number): Promise<Design> {
+  const fullPrompt = `Para uma marca sobre "${basePrompt}", crie um ${config.type}: ${config.promptSuffix}`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [{ text: fullPrompt }],
+      },
+      config: {
+        imageConfig: {
+          aspectRatio: config.aspectRatio,
+        },
+      },
+    });
+
+    // Encontra a parte da imagem na resposta
+    const imagePart = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
+    if (!imagePart || !imagePart.inlineData) {
+      throw new Error(`Não foi possível encontrar dados da imagem para: ${config.type}`);
     }
-}
 
-
-export async function generateDesigns(basePrompt: string): Promise<Design[]> {
-  // Simulate API call delay for a better UX
-  await new Promise(resolve => setTimeout(resolve, 3000));
-
-  const results: Design[] = designConfigs.map((config, index) => {
-    const fullPrompt = `Para uma marca sobre "${basePrompt}", crie um ${config.type}: ${config.promptSuffix}`;
-    const { width, height } = getDimensions(config.aspectRatio);
-    // Use a unique seed for each image based on prompt and index to get different images per generation
-    const seed = `${basePrompt.slice(0, 10)}-${index}-${Date.now()}`;
-    
-    const imageUrl = `https://picsum.photos/seed/${seed}/${width}/${height}`;
+    const base64ImageData = imagePart.inlineData.data;
+    const imageUrl = `data:image/png;base64,${base64ImageData}`;
 
     return {
       id: `${Date.now()}-${index}`,
@@ -53,8 +58,36 @@ export async function generateDesigns(basePrompt: string): Promise<Design[]> {
       imageUrl,
       prompt: fullPrompt,
     };
+  } catch (error) {
+    console.error(`Erro ao gerar design (${config.type}):`, error);
+    // Relança o erro para ser capturado pelo Promise.allSettled
+    throw new Error(`Falha ao gerar o design do tipo ${config.type}.`);
+  }
+}
+
+export async function generateDesigns(basePrompt: string): Promise<Design[]> {
+  const generationPromises = designConfigs.map((config, index) =>
+    generateSingleDesign(basePrompt, config, index)
+  );
+
+  // Usa Promise.allSettled para lidar com falhas individuais de forma graciosa
+  const results = await Promise.allSettled(generationPromises);
+
+  const successfulDesigns: Design[] = [];
+  results.forEach(result => {
+    if (result.status === 'fulfilled') {
+      successfulDesigns.push(result.value);
+    } else {
+      // Registra o erro, mas não interrompe todo o processo
+      console.error("Um design falhou ao ser gerado:", result.reason);
+    }
   });
+
+  if (successfulDesigns.length === 0) {
+    // Se todos falharem, lança um erro geral para ser exibido ao usuário
+    throw new Error("Todos os designs falharam ao serem gerados. Verifique o console para mais detalhes.");
+  }
   
-  // Randomly shuffle to make it feel more "generated"
-  return results.sort(() => Math.random() - 0.5);
+  // Embaralha aleatoriamente para parecer mais "gerado"
+  return successfulDesigns.sort(() => Math.random() - 0.5);
 }
