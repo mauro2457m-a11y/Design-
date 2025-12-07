@@ -24,9 +24,8 @@ const App: React.FC = () => {
       setDesigns(result);
     } catch (err) {
       console.error(err);
-      setError(
-        'Falha ao gerar os designs. Tente novamente.'
-      );
+      const errorMessage = err instanceof Error ? err.message : 'Falha ao gerar os designs. Tente novamente.';
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

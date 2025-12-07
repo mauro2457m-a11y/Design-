@@ -1,4 +1,3 @@
-import { GoogleGenAI } from '@google/genai';
 import { DesignType, type Design } from '../types';
 
 interface DesignConfig {
@@ -25,16 +24,19 @@ const designConfigs: DesignConfig[] = [
 ];
 
 // Armazena a instância do cliente para evitar recriações.
-let aiClient: GoogleGenAI | null = null;
+let aiClient: any = null;
 
 /**
- * Inicializa e retorna o cliente GoogleGenAI de forma tardia (lazy).
+ * Inicializa e retorna o cliente GoogleGenAI de forma tardia (lazy),
+ * importando a biblioteca dinamicamente no primeiro uso.
  * Lança um erro se a chave de API não estiver disponível no ambiente.
  */
-function getAiClient(): GoogleGenAI {
+async function getAiClient(): Promise<any> {
   if (aiClient) {
     return aiClient;
   }
+  
+  const { GoogleGenAI } = await import('@google/genai');
 
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
@@ -51,7 +53,7 @@ async function generateSingleDesign(basePrompt: string, config: DesignConfig, in
   const fullPrompt = `Para uma marca sobre "${basePrompt}", crie um ${config.type}: ${config.promptSuffix}`;
 
   try {
-    const ai = getAiClient(); // Inicializa o cliente no primeiro uso
+    const ai = await getAiClient(); // Inicializa e importa o cliente no primeiro uso
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
@@ -66,7 +68,7 @@ async function generateSingleDesign(basePrompt: string, config: DesignConfig, in
     });
 
     // Encontra a parte da imagem na resposta
-    const imagePart = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
+    const imagePart = response.candidates?.[0]?.content?.parts.find((p: any) => p.inlineData);
     if (!imagePart || !imagePart.inlineData) {
       throw new Error(`Não foi possível encontrar dados da imagem para: ${config.type}`);
     }
