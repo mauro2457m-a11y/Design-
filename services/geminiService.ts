@@ -24,13 +24,35 @@ const designConfigs: DesignConfig[] = [
   { type: DesignType.POST, promptSuffix: 'post para rede social (Instagram), design gráfico informativo com tipografia forte.', aspectRatio: '1:1' },
 ];
 
-// A chave de API é fornecida automaticamente pelo ambiente.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+// Armazena a instância do cliente para evitar recriações.
+let aiClient: GoogleGenAI | null = null;
+
+/**
+ * Inicializa e retorna o cliente GoogleGenAI de forma tardia (lazy).
+ * Lança um erro se a chave de API não estiver disponível no ambiente.
+ */
+function getAiClient(): GoogleGenAI {
+  if (aiClient) {
+    return aiClient;
+  }
+
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    console.error("A chave de API (API_KEY) não foi encontrada no ambiente.");
+    throw new Error("A chave de API do Google não está configurada. Não é possível gerar imagens.");
+  }
+  
+  aiClient = new GoogleGenAI({ apiKey });
+  return aiClient;
+}
+
 
 async function generateSingleDesign(basePrompt: string, config: DesignConfig, index: number): Promise<Design> {
   const fullPrompt = `Para uma marca sobre "${basePrompt}", crie um ${config.type}: ${config.promptSuffix}`;
 
   try {
+    const ai = getAiClient(); // Inicializa o cliente no primeiro uso
+
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
@@ -61,7 +83,7 @@ async function generateSingleDesign(basePrompt: string, config: DesignConfig, in
   } catch (error) {
     console.error(`Erro ao gerar design (${config.type}):`, error);
     // Relança o erro para ser capturado pelo Promise.allSettled
-    throw new Error(`Falha ao gerar o design do tipo ${config.type}.`);
+    throw error;
   }
 }
 
