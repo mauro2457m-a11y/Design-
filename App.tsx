@@ -25,7 +25,7 @@ const App: React.FC = () => {
     } catch (err) {
       console.error(err);
       setError(
-        'Falha ao gerar os designs. Verifique o console para mais detalhes e tente novamente.'
+        'Falha ao gerar os designs. Tente novamente.'
       );
     } finally {
       setIsLoading(false);

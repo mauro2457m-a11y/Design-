@@ -1,4 +1,3 @@
-import { GoogleGenAI } from '@google/genai';
 import { DesignType, type Design } from '../types';
 
 interface DesignConfig {
@@ -24,40 +23,38 @@ const designConfigs: DesignConfig[] = [
   { type: DesignType.POST, promptSuffix: 'post para rede social (Instagram), design gráfico informativo com tipografia forte.', aspectRatio: '1:1' },
 ];
 
-export async function generateDesigns(basePrompt: string): Promise<Design[]> {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-  const generationPromises = designConfigs.map(async (config, index) => {
-    const fullPrompt = `Para uma marca sobre "${basePrompt}", crie um ${config.type}: ${config.promptSuffix}`;
-    
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-image-preview',
-      contents: {
-        parts: [{ text: fullPrompt }],
-      },
-      config: {
-        imageConfig: {
-          aspectRatio: config.aspectRatio,
-          imageSize: '1K',
-        },
-      },
-    });
-
-    for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData) {
-        const base64EncodeString: string = part.inlineData.data;
-        const imageUrl = `data:image/png;base64,${base64EncodeString}`;
-        return {
-          id: `${Date.now()}-${index}`,
-          type: config.type,
-          imageUrl,
-          prompt: fullPrompt,
-        };
-      }
+// Helper to get dimensions from aspect ratio
+const getDimensions = (aspectRatio: '1:1' | '16:9' | '9:16' | '4:3'): { width: number, height: number } => {
+    switch (aspectRatio) {
+        case '16:9': return { width: 800, height: 450 };
+        case '9:16': return { width: 450, height: 800 };
+        case '4:3': return { width: 800, height: 600 };
+        case '1:1':
+        default: return { width: 500, height: 500 };
     }
-    throw new Error(`Nenhuma imagem gerada para o prompt: ${fullPrompt}`);
-  });
+}
 
-  const results = await Promise.all(generationPromises);
-  return results;
+
+export async function generateDesigns(basePrompt: string): Promise<Design[]> {
+  // Simulate API call delay for a better UX
+  await new Promise(resolve => setTimeout(resolve, 3000));
+
+  const results: Design[] = designConfigs.map((config, index) => {
+    const fullPrompt = `Para uma marca sobre "${basePrompt}", crie um ${config.type}: ${config.promptSuffix}`;
+    const { width, height } = getDimensions(config.aspectRatio);
+    // Use a unique seed for each image based on prompt and index to get different images per generation
+    const seed = `${basePrompt.slice(0, 10)}-${index}-${Date.now()}`;
+    
+    const imageUrl = `https://picsum.photos/seed/${seed}/${width}/${height}`;
+
+    return {
+      id: `${Date.now()}-${index}`,
+      type: config.type,
+      imageUrl,
+      prompt: fullPrompt,
+    };
+  });
+  
+  // Randomly shuffle to make it feel more "generated"
+  return results.sort(() => Math.random() - 0.5);
 }

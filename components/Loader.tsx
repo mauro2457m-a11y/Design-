@@ -1,7 +1,12 @@
 import React from 'react';
 
-export const Loader: React.FC = () => {
-  const messages = [
+interface LoaderProps {
+  message?: string;
+  showSubtext?: boolean;
+}
+
+export const Loader: React.FC<LoaderProps> = ({ message, showSubtext = true }) => {
+  const defaultMessages = [
     "Desenhando logos...",
     "Esboçando banners...",
     "Criando capas...",
@@ -10,26 +15,29 @@ export const Loader: React.FC = () => {
     "Polindo os pixels...",
   ];
   
-  const [message, setMessage] = React.useState(messages[0]);
+  const [dynamicMessage, setDynamicMessage] = React.useState(defaultMessages[0]);
 
   React.useEffect(() => {
+    if (message) return; // Don't cycle if a static message is provided
+
     const intervalId = setInterval(() => {
-      setMessage(prevMessage => {
-        const currentIndex = messages.indexOf(prevMessage);
-        const nextIndex = (currentIndex + 1) % messages.length;
-        return messages[nextIndex];
+      setDynamicMessage(prevMessage => {
+        const currentIndex = defaultMessages.indexOf(prevMessage);
+        const nextIndex = (currentIndex + 1) % defaultMessages.length;
+        return defaultMessages[nextIndex];
       });
     }, 2000);
 
     return () => clearInterval(intervalId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [message]);
 
   return (
     <div className="flex flex-col items-center justify-center text-center">
       <div className="w-16 h-16 border-4 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
-      <p className="mt-4 text-lg text-amber-300 font-semibold transition-opacity duration-500">{message}</p>
-      <p className="mt-2 text-gray-400">Isso pode levar alguns instantes.</p>
+      <p className="mt-4 text-lg text-amber-300 font-semibold transition-opacity duration-500">
+        {message || dynamicMessage}
+      </p>
+      {showSubtext && <p className="mt-2 text-gray-400">Isso pode levar alguns instantes.</p>}
     </div>
   );
 };
